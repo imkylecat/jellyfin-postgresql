@@ -1,0 +1,97 @@
+---
+name: Build & Push Container Image
+
+on:
+  push:
+    branches: ['main']
+    tags:
+      - 'v*'
+    paths-ignore:
+      - Readme.md
+      - .gitignore
+  pull_request:
+    branches: ['main']
+    paths-ignore:
+      - Readme.md
+      - .gitignore
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_DESCRIPTION: Jellyfin Container with Built-In PgSQL Plugin.
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  oci-build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+      env:
+        DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+        DOTNET_ROOT: ${{ github.workspace }}/.dotnet
+        DOTNET_CLI_HOME: ${{ github.workspace }}/.dotnet
+        NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+    - name: Build Plugin
+      run: |
+        cd Jellyfin.Pgsql
+        dotnet restore Jellyfin.Plugin.Pgsql.sln
+        dotnet publish Jellyfin.Plugin.Pgsql/Jellyfin.Plugin.Pgsql.csproj -c Release --no-restore -o ../publish
+      env:
+        DOTNET_ROOT: ${{ github.workspace }}/.dotnet
+        DOTNET_CLI_HOME: ${{ github.workspace }}/.dotnet
+        NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+        HOME: ${{ github.workspace }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        annotations: |
+          org.opencontainers.image.description=${{ env.IMAGE_DESCRIPTION }}
+        tags: |
+          type=semver,pattern=v{{version}}
+          type=semver,pattern=v{{major}}.{{minor}}
+          type=semver,pattern=v{{major}}
+          type=edge,branch=main
+          type=ref,event=pr
+          type=sha
+
+    - name: Build and Push Docker image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        annotations: ${{ steps.meta.outputs.annotations }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: true
+        sbom: true

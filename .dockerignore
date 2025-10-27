@@ -1,0 +1,41 @@
+# Git files
+.git
+.gitignore
+.gitmodules
+
+# GitHub Actions
+.github
+
+# Documentation
+*.md
+README*
+
+# Build artifacts (except publish/ which we need)
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/TestResults/
+
+# .NET SDK and NuGet cache (from runner build)
+.dotnet/
+.nuget/
+
+# Don't ignore publish/ - we need this for the Docker build
+!publish/
+
+# IDE files
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+*.temp
