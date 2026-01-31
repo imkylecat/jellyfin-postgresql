@@ -1,5 +1,5 @@
 # Jellyfin with plugin - expects pre-built plugin in publish/
-FROM jellyfin/jellyfin:latest
+FROM jellyfin/jellyfin:nightly
 
 # Install PostgreSQL 17 client tools for backup/restore functionality
 RUN apt-get update && \
